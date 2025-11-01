@@ -1,6 +1,6 @@
 # Focus Notes
 
-Focus Notes is a native SwiftUI note-taking app built for iOS 17 and above. The app captures spoken content, transcribes it using OpenRouter's `nvidia/nemotron-nano-9b-v2:free` model, and then crafts production-quality study notes.
+Focus Notes is a native SwiftUI note-taking app built for iOS 17 and above. The app captures spoken content, transcribes it using OpenRouter's `openai/gpt-4o-mini-transcribe` model, and then crafts production-quality study notes with `nvidia/nemotron-nano-9b-v2:free`.
 
 ## Features
 
@@ -12,7 +12,7 @@ Focus Notes is a native SwiftUI note-taking app built for iOS 17 and above. The 
 ## Requirements
 
 - Xcode 16 or later (iOS 18 SDK) or Xcode 15 (iOS 17 SDK).
-- An OpenRouter account with access to the `nvidia/nemotron-nano-9b-v2:free` model.
+- An OpenRouter account with access to the `openai/gpt-4o-mini-transcribe` and `nvidia/nemotron-nano-9b-v2:free` models.
 
 ## Configuration
 
