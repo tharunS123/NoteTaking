@@ -27,8 +27,8 @@ struct NoteSummary: Equatable {
 
 struct OpenRouterTranscriptionService {
     private let session: URLSession
-    private let transcriptionModel = "openai/gpt-4o-mini-transcribe"
-    private let summarizationModel = "nvidia/nemotron-nano-9b-v2:free"
+    private let transcriptionModel = "openai/gpt-oss-120b"
+    private let summarizationModel = "openai/gpt-oss-120b"
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -42,7 +42,7 @@ struct OpenRouterTranscriptionService {
 
     private func transcribeAudio(from audioURL: URL) async throws -> String {
         let apiKey = try fetchAPIKey()
-        let url = URL(string: "https://openrouter.ai/api/v1/audio/transcriptions")!
+        let url = URL(string: "https://openrouter.ai/api/v1")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         let boundary = UUID().uuidString
@@ -71,6 +71,7 @@ struct OpenRouterTranscriptionService {
             let result = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
             return result.text
         } catch {
+            print("This is a message printed to the Xcode console.")
             throw TranscriptionServiceError.decodingError
         }
     }
