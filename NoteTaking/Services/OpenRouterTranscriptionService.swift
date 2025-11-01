@@ -4,6 +4,7 @@ enum TranscriptionServiceError: LocalizedError {
     case missingAPIKey
     case invalidResponse
     case decodingError
+    case serviceError(String)
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +14,8 @@ enum TranscriptionServiceError: LocalizedError {
             return "Received an unexpected response from the transcription service."
         case .decodingError:
             return "Unable to decode the response from the transcription service."
+        case .serviceError(let message):
+            return message
         }
     }
 }
@@ -24,7 +27,8 @@ struct NoteSummary: Equatable {
 
 struct OpenRouterTranscriptionService {
     private let session: URLSession
-    private let model = "nvidia/nemotron-nano-9b-v2:free"
+    private let transcriptionModel = "openai/gpt-4o-mini-transcribe"
+    private let summarizationModel = "nvidia/nemotron-nano-9b-v2:free"
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -46,11 +50,20 @@ struct OpenRouterTranscriptionService {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         let audioData = try Data(contentsOf: audioURL)
-        let multipartData = makeMultipartBody(boundary: boundary, fileName: audioURL.lastPathComponent, fileData: audioData)
+        let multipartData = makeMultipartBody(boundary: boundary,
+                                              model: transcriptionModel,
+                                              fileName: audioURL.lastPathComponent,
+                                              fileData: audioData)
         request.httpBody = multipartData
 
         let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TranscriptionServiceError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            if let apiError = decodeServiceError(from: data) {
+                throw TranscriptionServiceError.serviceError(apiError)
+            }
             throw TranscriptionServiceError.invalidResponse
         }
 
@@ -74,7 +87,7 @@ struct OpenRouterTranscriptionService {
         You are an expert note-taking assistant. Create comprehensive, structured notes from the provided transcript.\n\nRequirements:\n- Start with a one-sentence executive summary.\n- Include a detailed bullet list of key points.\n- Add action items with owners if they exist.\n- Highlight terminology or definitions if mentioned.\n- Conclude with suggested follow-up questions.\n\nTranscript:\n\(transcript)
         """
 
-        let payload = ChatCompletionPayload(model: model, messages: [
+        let payload = ChatCompletionPayload(model: summarizationModel, messages: [
             .init(role: "system", content: "You transform spoken content into clear, well structured notes for students and professionals."),
             .init(role: "user", content: prompt)
         ], temperature: 0.2)
@@ -82,7 +95,13 @@ struct OpenRouterTranscriptionService {
         request.httpBody = try JSONEncoder().encode(payload)
 
         let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TranscriptionServiceError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            if let apiError = decodeServiceError(from: data) {
+                throw TranscriptionServiceError.serviceError(apiError)
+            }
             throw TranscriptionServiceError.invalidResponse
         }
 
@@ -104,7 +123,7 @@ struct OpenRouterTranscriptionService {
         return value
     }
 
-    private func makeMultipartBody(boundary: String, fileName: String, fileData: Data) -> Data {
+    private func makeMultipartBody(boundary: String, model: String, fileName: String, fileData: Data) -> Data {
         var body = Data()
         let lineBreak = "\r\n"
 
@@ -121,6 +140,11 @@ struct OpenRouterTranscriptionService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
         return body
+    }
+
+    private func decodeServiceError(from data: Data) -> String? {
+        guard let apiError = try? JSONDecoder().decode(ServiceErrorResponse.self, from: data) else { return nil }
+        return apiError.error.message
     }
 }
 
@@ -150,4 +174,12 @@ private struct ChatCompletionResponse: Decodable {
     }
 
     let choices: [Choice]
+}
+
+private struct ServiceErrorResponse: Decodable {
+    struct APIError: Decodable {
+        let message: String
+    }
+
+    let error: APIError
 }
