@@ -98,7 +98,7 @@ struct OpenRouterTranscriptionService {
     }
 
     private func fetchAPIKey() throws -> String {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "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") as? String, !value.isEmpty else {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "OPENROUTER_API_KEY") as? String, !value.isEmpty else {
             throw TranscriptionServiceError.missingAPIKey
         }
         return value
